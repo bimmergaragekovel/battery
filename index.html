@@ -206,6 +206,7 @@
         <div class="f-item"><span class="f-label">Дата запису</span><input type="text" id="f-date" placeholder="19.08"></div>
         <div class="f-item"><span class="f-label">К-сть, ящ.</span><input type="text" id="f-qty" placeholder="1" oninput="updateFormQtyBreakdown(this); updateFormSum();"><div class="qty-breakdown" id="form-qty-breakdown"></div></div>
       </div>
+      <div class="f-item"><span class="f-label">Тип батареї</span><select id="f-type"></select></div>
       <div class="f-item"><span class="f-label">ФІО отримувача</span><input type="text" id="f-receiver" placeholder="Прізвище Ім'я"></div>
       <div class="f-item"><span class="f-label">Телефон отримувача</span><input type="text" id="f-phone" placeholder="+380"></div>
       <div class="f-item"><span class="f-label">ФІО відправника</span><input type="text" id="f-sender" placeholder="Андрій (BimmerGarage)"></div>
@@ -250,25 +251,25 @@ const STATUS_LABEL = {queue:'В черзі', progress:'Виконується', 
 
 function defaultTypes(){
   return [
-    {name:'280 Ah', kit:false, stock:12, reserved:2, doneSum:42000},
-    {name:'334 Ah', kit:false, stock:6,  reserved:1, doneSum:16000},
-    {name:'АКБ 280/48', kit:true, base:'280 Ah', reserved:0, doneSum:0},
-    {name:'АКБ 334/48', kit:true, base:'334 Ah', reserved:0, doneSum:0}
+    {name:'280 Ah', kit:false, stock:12},
+    {name:'334 Ah', kit:false, stock:6},
+    {name:'АКБ 280/48', kit:true, base:'280 Ah'},
+    {name:'АКБ 334/48', kit:true, base:'334 Ah'}
   ];
 }
 function defaultEntries(){
   return [
-    {id:1, date:'12.08', rel:'7 днів тому', qty:2, receiver:'Петренко О.', phone:'+380 67 ___ __ __', sender:'Андрій (BimmerGarage)', price:1000, sum:2000, address:'Луцьк, відділення №4 (Нова пошта)', ship:'', pay:'cod', status:'queue'},
-    {id:2, date:'15.08', rel:'4 дні тому', qty:1, receiver:'Хоменко В.', phone:'+380 50 ___ __ __', sender:'Андрій (BimmerGarage)', price:1000, sum:1000, address:'Ковель, вул. Незалежності 12 (кур’єр)', ship:'22.08', pay:'fop', status:'progress'},
-    {id:3, date:'18.08', rel:'1 день тому', qty:3, receiver:'Іванюк С.', phone:'+380 63 ___ __ __', sender:'Андрій (BimmerGarage)', price:1000, sum:3000, address:'Львів, відділення №21 (Нова пошта)', ship:'', pay:'card', status:'queue'},
-    {id:4, date:'08.08', rel:'11 днів тому', qty:1, receiver:'Мельник Т.', phone:'+380 95 ___ __ __', sender:'Андрій (BimmerGarage)', price:1000, sum:1000, address:'Ковель, самовивіз', ship:'09.08 — отримано', pay:'cash', status:'done'}
+    {id:1, typeIdx:0, date:'12.08', rel:'7 днів тому', qty:2, receiver:'Петренко О.', phone:'+380 67 ___ __ __', sender:'Андрій (BimmerGarage)', price:1000, sum:2000, address:'Луцьк, відділення №4 (Нова пошта)', ship:'', pay:'cod', status:'queue'},
+    {id:2, typeIdx:1, date:'15.08', rel:'4 дні тому', qty:1, receiver:'Хоменко В.', phone:'+380 50 ___ __ __', sender:'Андрій (BimmerGarage)', price:1000, sum:1000, address:'Ковель, вул. Незалежності 12 (кур’єр)', ship:'22.08', pay:'fop', status:'progress'},
+    {id:3, typeIdx:0, date:'18.08', rel:'1 день тому', qty:3, receiver:'Іванюк С.', phone:'+380 63 ___ __ __', sender:'Андрій (BimmerGarage)', price:1000, sum:3000, address:'Львів, відділення №21 (Нова пошта)', ship:'', pay:'card', status:'queue'},
+    {id:4, typeIdx:1, date:'08.08', rel:'11 днів тому', qty:1, receiver:'Мельник Т.', phone:'+380 95 ___ __ __', sender:'Андрій (BimmerGarage)', price:1000, sum:1000, address:'Ковель, самовивіз', ship:'09.08 — отримано', pay:'cash', status:'done'}
   ];
 }
 function emptyWarehouse(){ return {types:[
-    {name:'280 Ah', kit:false, stock:0, reserved:0, doneSum:0},
-    {name:'334 Ah', kit:false, stock:0, reserved:0, doneSum:0},
-    {name:'АКБ 280/48', kit:true, base:'280 Ah', reserved:0, doneSum:0},
-    {name:'АКБ 334/48', kit:true, base:'334 Ah', reserved:0, doneSum:0}
+    {name:'280 Ah', kit:false, stock:0},
+    {name:'334 Ah', kit:false, stock:0},
+    {name:'АКБ 280/48', kit:true, base:'280 Ah'},
+    {name:'АКБ 334/48', kit:true, base:'334 Ah'}
   ], entries:[], nextId:1}; }
 
 const STORAGE_KEY = 'bimmergarage-battery-app';
@@ -326,6 +327,7 @@ function fmtMoney(n){ n = parseFloat(n)||0; return n.toLocaleString('uk-UA') + '
 /* ---------- rendering ---------- */
 function renderAll(){
   renderStats();
+  renderFormTypeOptions();
   renderSummary();
   renderEntries();
 }
@@ -334,12 +336,16 @@ function renderStats(){
   const wh = activeWH();
   const body = document.getElementById('stats-body');
   body.innerHTML = wh.types.map((t, idx)=>{
+    const forType = (wh.entries||[]).filter(e => e.typeIdx === idx);
+    const reservedQty = forType.filter(e=>e.status==='queue' || e.status==='progress').reduce((s,e)=>s+(parseInt(e.qty)||0), 0);
+    const doneSum = forType.filter(e=>e.status==='done').reduce((s,e)=>s+(parseFloat(e.sum)||0), 0);
+
     if(t.kit){
       return `<div class="stats-type">
         <div class="st-name">${t.name} <span class="st-subname">(комплект 4 ящики ${t.base})</span></div>
         <div class="akb-note">⚠️ При замовленні автоматично списується 4 ящики з залишку «${t.base}»</div>
-        <div class="stats-row"><span class="st-label">У черзі (заброньовано)</span><span class="st-reserved">${t.reserved} компл.</span></div>
-        <div class="stats-row"><span class="st-label">Виконано, сума</span><span class="st-done">${fmtMoney(t.doneSum)}</span></div>
+        <div class="stats-row"><span class="st-label">У черзі (заброньовано)</span><span class="st-reserved">${reservedQty} компл.</span></div>
+        <div class="stats-row"><span class="st-label">Виконано, сума</span><span class="st-done">${fmtMoney(doneSum)}</span></div>
       </div>`;
     }
     return `<div class="stats-type">
@@ -351,8 +357,8 @@ function renderStats(){
           <div class="st-breakdown">${boxBreakdown(t.stock)}</div>
         </div>
       </div>
-      <div class="stats-row"><span class="st-label">У черзі (заброньовано)</span><span class="st-reserved">${t.reserved} ящ.</span></div>
-      <div class="stats-row"><span class="st-label">Виконано, сума</span><span class="st-done">${fmtMoney(t.doneSum)}</span></div>
+      <div class="stats-row"><span class="st-label">У черзі (заброньовано)</span><span class="st-reserved">${reservedQty} ящ.</span></div>
+      <div class="stats-row"><span class="st-label">Виконано, сума</span><span class="st-done">${fmtMoney(doneSum)}</span></div>
     </div>`;
   }).join('');
 }
@@ -421,7 +427,10 @@ function cardHTML(e){
 }
 
 function viewDetailHTML(e){
+  const wh = activeWH();
+  const typeName = (wh.types[e.typeIdx] && wh.types[e.typeIdx].name) || '—';
   return `
+    <div class="d-item"><span class="d-label">Тип батареї</span><span class="d-value">${typeName}</span></div>
     <div class="d-item"><span class="d-label">Кількість, ящ.</span><span class="d-value">${e.qty}</span></div>
     <div class="d-item"><span class="d-label">Отримувач</span><span class="d-value">${e.receiver}</span></div>
     <div class="d-item"><span class="d-label">Відправник</span><span class="d-value">${e.sender}</span></div>
@@ -448,7 +457,10 @@ function viewDetailHTML(e){
 }
 
 function editFormHTML(e){
+  const wh = activeWH();
+  const typeOptions = wh.types.map((t,i)=>`<option value="${i}" ${e.typeIdx===i?'selected':''}>${t.name}</option>`).join('');
   return `
+    <div class="d-item"><span class="d-label">Тип батареї</span><select id="e-type-${e.id}">${typeOptions}</select></div>
     <div class="d-item"><span class="d-label">Кількість, ящ.</span><input type="text" id="e-qty-${e.id}" value="${e.qty}" oninput="updateEditSum(${e.id})"></div>
     <div class="d-item"><span class="d-label">Отримувач</span><input type="text" id="e-receiver-${e.id}" value="${e.receiver}"></div>
     <div class="d-item"><span class="d-label">Відправник</span><input type="text" id="e-sender-${e.id}" value="${e.sender}"></div>
@@ -486,6 +498,7 @@ function deleteEntry(id){
   wh.entries = wh.entries.filter(x=>x.id!==id);
   if(editingId === id) editingId = null;
   saveState();
+  renderStats();
   renderSummary();
   renderEntries();
 }
@@ -494,6 +507,7 @@ function saveEdit(id){
   const e = wh.entries.find(x=>x.id===id);
   if(!e) return;
   e.qty = parseInt(document.getElementById('e-qty-'+id).value)||0;
+  e.typeIdx = parseInt(document.getElementById('e-type-'+id).value);
   e.receiver = document.getElementById('e-receiver-'+id).value.trim();
   e.sender = document.getElementById('e-sender-'+id).value.trim();
   e.phone = document.getElementById('e-phone-'+id).value.trim();
@@ -504,6 +518,7 @@ function saveEdit(id){
   e.comment = document.getElementById('e-comment-'+id).value.trim();
   editingId = null;
   saveState();
+  renderStats();
   renderEntries();
 }
 
@@ -513,6 +528,7 @@ function changeStatus(id, val){
   if(!e) return;
   e.status = val;
   saveState();
+  renderStats();
   renderSummary();
   renderEntries();
 }
@@ -526,6 +542,13 @@ function updateFormSum(){
   const price = parseFloat(document.getElementById('f-price').value) || 0;
   document.getElementById('f-sum').value = (qty && price) ? (qty * price) : '';
 }
+function renderFormTypeOptions(){
+  const wh = activeWH();
+  const sel = document.getElementById('f-type');
+  const prev = sel.value;
+  sel.innerHTML = wh.types.map((t,i)=>`<option value="${i}">${t.name}</option>`).join('');
+  if(prev !== '' && wh.types[prev]) sel.value = prev;
+}
 
 function addEntry(){
   const wh = activeWH();
@@ -534,6 +557,7 @@ function addEntry(){
   const now = new Date();
   const entry = {
     id: wh.nextId++,
+    typeIdx: parseInt(document.getElementById('f-type').value)||0,
     date: document.getElementById('f-date').value.trim() || (now.getDate()+'.'+(now.getMonth()+1)),
     rel: 'щойно',
     qty: parseInt(document.getElementById('f-qty').value)||0,
@@ -554,6 +578,7 @@ function addEntry(){
   document.getElementById('f-status').className='status-select v-queue';
   document.getElementById('form-qty-breakdown').textContent='';
   saveState();
+  renderStats();
   renderSummary();
   renderEntries();
 }
