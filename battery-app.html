@@ -1,0 +1,613 @@
+<!DOCTYPE html>
+<html lang="uk">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Облік батарей — BimmerGarage</title>
+<link href="https://fonts.googleapis.com/css2?family=Exo+2:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#0d0d0d; --card:#141414; --card-border:#1e1e1e;
+    --accent:#c00; --blue:#4d9fd6; --green:#27c47a;
+    --meta:#606060; --white:#e8e8e8;
+  }
+  *{box-sizing:border-box; margin:0; padding:0;}
+  body{background:var(--bg); font-family:'Exo 2', sans-serif; color:var(--white); padding:16px 14px 60px; min-height:100vh;}
+  .wrap{max-width:960px; margin:0 auto;}
+
+  /* warehouse switcher — very top */
+  .wh-switch{
+    display:flex; gap:8px; margin-bottom:14px;
+    background:var(--card); border:1px solid var(--card-border);
+    border-radius:10px; padding:5px;
+  }
+  .wh-switch button{
+    flex:1; background:transparent; border:none; color:var(--meta);
+    font-family:inherit; font-weight:700; font-size:13px; padding:10px;
+    border-radius:7px; cursor:pointer;
+  }
+  .wh-switch button.active{background:var(--accent); color:#fff;}
+
+  .backup-row{display:flex; gap:8px; margin-bottom:18px;}
+  .btn-backup{
+    flex:1; display:flex; align-items:center; justify-content:center; gap:6px;
+    background:#1a1a1a; border:1px solid #2a2a2a; color:var(--white);
+    font-family:inherit; font-weight:700; font-size:12px; padding:9px; border-radius:8px; cursor:pointer;
+  }
+  .btn-backup:hover{background:#222;}
+
+  .topbar{display:flex; align-items:center; justify-content:space-between; margin-bottom:18px; padding-bottom:14px; border-bottom:1px solid var(--card-border); position:relative;}
+  .topbar::after{content:""; position:absolute; left:0; bottom:-1px; width:64px; height:3px; background:linear-gradient(90deg, var(--accent) 0 33%, #fff 33% 66%, var(--blue) 66% 100%);}
+  .brand .name{font-weight:800; font-size:15px; letter-spacing:.5px;}
+  .brand .name span{color:var(--accent);}
+  .title{font-weight:700; font-size:19px; margin-top:5px;}
+  .subtitle{font-size:11.5px; color:var(--meta); margin-top:3px;}
+
+  .stats-card{background:var(--card); border:1px solid var(--card-border); border-radius:12px; overflow:hidden; margin-bottom:16px;}
+  .stats-card summary{list-style:none; cursor:pointer; display:flex; align-items:center; justify-content:space-between; padding:14px 16px;}
+  .stats-card summary::-webkit-details-marker{display:none;}
+  .stats-card summary .st-title{display:flex; align-items:center; gap:9px; font-weight:700; font-size:14px;}
+  .stats-card summary .chevron{color:var(--meta); font-size:12px; transition:transform .18s;}
+  .stats-card[open] summary .chevron{transform:rotate(180deg);}
+  .stats-card[open] summary{border-bottom:1px solid var(--card-border);}
+  .stats-hint{font-size:11px; color:var(--meta); padding:0 16px 12px; margin-top:-4px;}
+  .stats-body{padding:14px 16px 16px;}
+  .stats-type{padding:12px 0; border-bottom:1px solid var(--card-border);}
+  .stats-type:last-child{border-bottom:none; padding-bottom:0;}
+  .stats-type .st-name{font-weight:700; font-size:13.5px; margin-bottom:9px;}
+  .stats-type .st-subname{font-weight:400; font-size:11px; color:var(--meta);}
+  .akb-note{font-size:11px; color:#f0c956; background:rgba(240,201,86,.08); border:1px solid rgba(240,201,86,.25); border-radius:6px; padding:7px 9px; margin-bottom:10px; line-height:1.4;}
+  .stats-row{display:flex; align-items:center; justify-content:space-between; gap:10px; margin-bottom:8px;}
+  .stats-row:last-child{margin-bottom:0;}
+  .stats-row .st-label{font-size:12px; color:var(--meta);}
+  .stats-row input.st-stock{width:70px; text-align:center; background:#0a0a0a; border:1px solid #2a2a2a; color:var(--white); font-family:inherit; font-weight:700; font-size:13px; padding:6px 8px; border-radius:6px;}
+  .stats-row .st-reserved{font-weight:700; font-size:13px; color:var(--accent);}
+  .stats-row .st-done{font-weight:700; font-size:13px; color:var(--green);}
+  .st-breakdown{font-size:10.5px; color:var(--meta); font-style:italic; margin-top:3px;}
+
+  .summary{display:grid; grid-template-columns:repeat(3,1fr); gap:10px; margin-bottom:16px;}
+  .sum-card{background:var(--card); border:1px solid var(--card-border); border-radius:10px; padding:12px 10px; text-align:center;}
+  .sum-card .label{font-size:10.5px; color:var(--meta);}
+  .sum-card .value{font-size:19px; font-weight:700; margin-top:4px;}
+  .sum-card.status-red{border-color:rgba(204,0,0,.3);} .sum-card.status-red .value{color:var(--accent);}
+  .sum-card.status-green{border-color:rgba(39,196,122,.3);} .sum-card.status-green .value{color:var(--green);}
+  .sum-card.status-blue{border-color:rgba(77,159,214,.3);} .sum-card.status-blue .value{color:var(--blue);}
+
+  .toolbar{margin-bottom:16px;}
+  .toolbar input{width:100%; background:#101010; border:1px solid var(--card-border); color:var(--white); font-family:inherit; font-size:13px; padding:10px 12px; border-radius:8px;}
+  .toolbar input::placeholder{color:var(--meta);}
+
+  .section-head{display:flex; align-items:baseline; justify-content:space-between; margin:0 0 8px;}
+  .section-head h2{font-size:15px; font-weight:700;}
+  .section-head .count{font-size:11px; color:var(--meta); background:var(--card); border:1px solid var(--card-border); border-radius:20px; padding:3px 10px;}
+  .sort-hint{font-size:10.5px; color:var(--meta); margin-bottom:12px;}
+
+  .form-card{background:linear-gradient(180deg,#171313 0%,#141414 100%); border:1px solid rgba(204,0,0,.35); border-radius:12px; overflow:hidden; box-shadow:0 6px 20px rgba(204,0,0,.08); margin-bottom:24px;}
+  .form-card-head{display:flex; align-items:center; gap:9px; padding:13px 16px; background:rgba(204,0,0,.1); border-bottom:1px solid rgba(204,0,0,.25); font-weight:700; font-size:13.5px;}
+  .fc-icon{display:inline-flex; align-items:center; justify-content:center; width:20px; height:20px; border-radius:6px; background:var(--accent); color:#fff; font-size:13px; font-weight:800;}
+  .wl-form{padding:16px; background:#101418; display:flex; flex-direction:column; gap:10px;}
+  .f-item{display:flex; flex-direction:column; gap:5px;}
+  .f-label{font-size:10px; text-transform:uppercase; letter-spacing:.4px; color:var(--meta);}
+  .f-row2{display:grid; grid-template-columns:1fr 1fr; gap:10px;}
+  .wl-form input, .wl-form select{background:#0a0a0a; border:1px solid #262626; color:var(--white); font-family:inherit; font-size:13px; padding:9px 10px; border-radius:6px; width:100%;}
+  .wl-form input::placeholder{color:#555;}
+  .qty-breakdown{font-size:10.5px; color:var(--meta); font-style:italic; margin-top:2px;}
+  .f-submit{margin-top:2px; display:flex; align-items:center; justify-content:center; gap:6px; background:var(--accent); color:#fff; border:none; font-family:inherit; font-weight:700; font-size:13px; padding:10px; border-radius:7px; cursor:pointer;}
+
+  .table-card{background:var(--card); border:1px solid var(--card-border); border-radius:12px; overflow:hidden;}
+  .wl-card{border-bottom:2px solid #262626; border-left:4px solid transparent;}
+  .wl-card:last-child{border-bottom:none;}
+  .wl-card.status-queue{border-left-color:var(--accent);}
+  .wl-card.status-progress{border-left-color:var(--green);}
+  .wl-card.status-done{border-left-color:var(--blue); opacity:.75;}
+  .wl-card[open]{background:#111417;}
+  .wl-card[open] summary{border-bottom:1px solid var(--card-border); background:#151a1e;}
+  .wl-card summary{list-style:none; cursor:pointer; display:flex; flex-direction:column; gap:7px; padding:14px 16px;}
+  .wl-card summary::-webkit-details-marker{display:none;}
+  .wl-card summary:hover{background:#181818;}
+  .s-top{display:flex; align-items:center; justify-content:space-between; gap:8px;}
+  .s-date{display:flex; align-items:baseline; gap:7px; flex-shrink:0;}
+  .s-date .d{font-weight:700; font-size:14px;}
+  .s-date .rel{font-size:10.5px; color:var(--meta);}
+  .s-top .status-pill{margin-left:auto; margin-right:2px;}
+  .s-name{font-weight:700; font-size:15px;}
+  .s-phone{font-size:12.5px; color:var(--meta);}
+  .s-bottom{display:flex; align-items:center; justify-content:space-between; gap:10px; margin-top:2px;}
+  .s-qty{color:var(--blue); font-weight:700; font-size:13px;}
+  .chevron{color:var(--meta); font-size:12px; transition:transform .18s;}
+  .wl-card[open] .chevron{transform:rotate(180deg);}
+
+  .status-pill{display:inline-flex; align-items:center; gap:5px; font-size:10.5px; font-weight:700; padding:3px 8px; border-radius:20px; white-space:nowrap;}
+  .status-pill .dot{width:6px; height:6px; border-radius:50%; display:inline-block;}
+  .status-pill.queue{background:rgba(204,0,0,.12); color:#ff6b6b;} .status-pill.queue .dot{background:var(--accent);}
+  .status-pill.progress{background:rgba(39,196,122,.12); color:var(--green);} .status-pill.progress .dot{background:var(--green);}
+  .status-pill.done{background:rgba(77,159,214,.12); color:var(--blue);} .status-pill.done .dot{background:var(--blue);}
+
+  .pay-badge{display:inline-flex; align-items:center; gap:6px; font-size:11.5px; font-weight:700; padding:5px 10px; border-radius:7px; border:1px solid transparent;}
+  .pay-badge.cod{background:rgba(77,159,214,.12); color:var(--blue); border-color:rgba(77,159,214,.3);}
+  .pay-badge.fop{background:rgba(224,90,90,.12); color:#e05a5a; border-color:rgba(224,90,90,.3);}
+  .pay-badge.card{background:rgba(39,196,122,.12); color:var(--green); border-color:rgba(39,196,122,.3);}
+  .pay-badge.cash{background:rgba(240,201,86,.12); color:#f0c956; border-color:rgba(240,201,86,.3);}
+
+  .wl-detail{padding:2px 16px 18px; display:flex; flex-direction:column; gap:12px;}
+  .d-item{display:flex; flex-direction:column; gap:3px;}
+  .d-label{font-size:10px; text-transform:uppercase; letter-spacing:.4px; color:var(--meta);}
+  .d-value{font-size:13.5px; line-height:1.4;}
+  .d-value.tbd{color:var(--meta); font-style:italic;}
+  .d-item input, .d-item select{background:#0a0a0a; border:1px solid #2a2a2a; color:var(--white); font-family:inherit; font-size:13px; padding:8px 9px; border-radius:6px; width:100%;}
+  .status-select{width:100%; background:#0a0a0a; border:1px solid #2a2a2a; color:var(--white); font-family:inherit; font-weight:700; font-size:13px; padding:8px 10px; border-radius:7px; cursor:pointer;}
+  .status-select.v-queue{border-color:rgba(204,0,0,.4); color:#ff6b6b;}
+  .status-select.v-progress{border-color:rgba(39,196,122,.4); color:var(--green);}
+  .status-select.v-done{border-color:rgba(77,159,214,.4); color:var(--blue);}
+  .wl-detail-actions{display:flex; gap:8px; margin-top:4px;}
+  .btn-edit, .btn-ship, .btn-save, .btn-cancel{flex:1; display:flex; align-items:center; justify-content:center; gap:6px; font-family:inherit; font-weight:700; font-size:12.5px; padding:9px; border-radius:7px; cursor:pointer;}
+  .btn-delete{width:100%; margin-top:8px; display:flex; align-items:center; justify-content:center; gap:6px; background:rgba(204,0,0,.08); border:1px solid rgba(204,0,0,.3); color:#ff6b6b; font-family:inherit; font-weight:700; font-size:12px; padding:9px; border-radius:7px; cursor:pointer;}
+  .btn-delete:hover{background:rgba(204,0,0,.18);}
+  .btn-edit{background:#1a1a1a; border:1px solid #2a2a2a; color:var(--white);}
+  .btn-edit:hover{background:#222;}
+  .btn-ship{background:rgba(77,159,214,.12); border:1px solid rgba(77,159,214,.35); color:var(--blue);}
+  .btn-ship:hover{background:rgba(77,159,214,.2);}
+  .btn-save{background:rgba(39,196,122,.15); border:1px solid rgba(39,196,122,.4); color:var(--green);}
+  .btn-cancel{background:#1a1a1a; border:1px solid #2a2a2a; color:var(--meta);}
+  .ship-preview{display:none; width:100%; margin-top:8px; background:#0a0a0a; border:1px solid #2a2a2a; border-radius:7px; color:var(--white); font-family:'Courier New', monospace; font-size:12px; line-height:1.6; padding:10px; resize:none;}
+
+  .empty-hint{padding:24px 16px; text-align:center; color:var(--meta); font-size:12.5px; font-style:italic;}
+  .save-toast{position:fixed; bottom:16px; left:50%; transform:translateX(-50%) translateY(20px); background:#1a1a1a; border:1px solid #2a2a2a; color:var(--green); font-size:12px; font-weight:700; padding:9px 16px; border-radius:20px; opacity:0; transition:.25s; pointer-events:none;}
+  .save-toast.show{opacity:1; transform:translateX(-50%) translateY(0);}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <div class="wh-switch">
+    <button id="wh-btn-1" onclick="switchWarehouse(1)">🏬 Склад 1</button>
+    <button id="wh-btn-2" onclick="switchWarehouse(2)">🏬 Склад 2</button>
+  </div>
+
+  <div class="backup-row">
+    <button class="btn-backup" onclick="exportBackup()">💾 Зберегти базу у файл</button>
+    <button class="btn-backup" onclick="document.getElementById('import-file').click()">📂 Завантажити базу</button>
+    <input type="file" id="import-file" accept="application/json" style="display:none" onchange="importBackup(this.files[0])">
+  </div>
+
+  <div class="topbar">
+    <div class="brand">
+      <div class="name">BIMMER<span>GARAGE</span></div>
+      <div class="title" id="wh-title">Облік проданих батарей — Склад 1</div>
+      <div class="subtitle">Всі продажі йдуть через чергу нижче · дані зберігаються в браузері автоматично</div>
+    </div>
+  </div>
+
+  <details class="stats-card">
+    <summary>
+      <div class="st-title"><span>📊</span> Статистика по типах</div>
+      <div class="chevron">▾</div>
+    </summary>
+    <div class="stats-hint">Продаж завжди йде ящиками · 1 ящик = 4 батареї · 1 акумулятор = 4 ящики (16 батарей)</div>
+    <div class="stats-body" id="stats-body"></div>
+  </details>
+
+  <div class="summary" id="summary-cards"></div>
+
+  <div class="toolbar">
+    <input type="text" id="search-box" placeholder="Пошук за клієнтом, телефоном..." oninput="renderEntries()">
+  </div>
+
+  <div class="section-head">
+    <h2>Черга продажів</h2>
+    <span class="count" id="entries-count">0 записів</span>
+  </div>
+  <div class="sort-hint"><span style="color:var(--accent);">↑</span> в черзі / виконується — зверху за датою; <span style="color:var(--blue);">↓</span> оплачені й завершені — опускаються вниз</div>
+
+  <div class="form-card">
+    <div class="form-card-head"><span class="fc-icon">+</span><span>Новий запис у черзі</span></div>
+    <div class="wl-form">
+      <div class="f-row2">
+        <div class="f-item"><span class="f-label">Дата запису</span><input type="text" id="f-date" placeholder="19.08"></div>
+        <div class="f-item"><span class="f-label">К-сть, ящ.</span><input type="text" id="f-qty" placeholder="1" oninput="updateFormQtyBreakdown(this)"><div class="qty-breakdown" id="form-qty-breakdown"></div></div>
+      </div>
+      <div class="f-item"><span class="f-label">ФІО отримувача</span><input type="text" id="f-receiver" placeholder="Прізвище Ім'я"></div>
+      <div class="f-item"><span class="f-label">Телефон отримувача</span><input type="text" id="f-phone" placeholder="+380"></div>
+      <div class="f-item"><span class="f-label">ФІО відправника</span><input type="text" id="f-sender" placeholder="Андрій (BimmerGarage)"></div>
+      <div class="f-row2">
+        <div class="f-item"><span class="f-label">Ціна за ящик</span><input type="text" id="f-price" placeholder="1000"></div>
+        <div class="f-item"><span class="f-label">Сума</span><input type="text" id="f-sum" placeholder="2000"></div>
+      </div>
+      <div class="f-item"><span class="f-label">Адреса доставки</span><input type="text" id="f-address" placeholder="Місто, відділення Нової пошти"></div>
+      <div class="f-row2">
+        <div class="f-item"><span class="f-label">Відправка</span><input type="text" id="f-ship" placeholder="дата"></div>
+        <div class="f-item"><span class="f-label">Оплата</span>
+          <select id="f-pay">
+            <option value="cod">Наложка</option>
+            <option value="fop">ФОП Ваня</option>
+            <option value="card">Карта</option>
+            <option value="cash">Готівка</option>
+          </select>
+        </div>
+      </div>
+      <div class="f-item"><span class="f-label">Статус</span>
+        <select id="f-status" class="status-select v-queue" onchange="this.className='status-select v-'+this.value">
+          <option value="queue">🔴 В черзі</option>
+          <option value="progress">🟢 Виконується</option>
+          <option value="done">🔵 Виконано і оплачено</option>
+        </select>
+      </div>
+      <button class="f-submit" onclick="addEntry()">+ Додати в чергу</button>
+    </div>
+  </div>
+
+  <div class="table-card" id="entries-list"></div>
+
+</div>
+
+<div class="save-toast" id="save-toast">✓ Збережено</div>
+
+<script>
+/* ---------- data model ---------- */
+const PAY_LABEL = {cod:'📦 Наложка', fop:'🧾 ФОП Ваня', card:'💳 Карта', cash:'💵 Готівка'};
+const STATUS_LABEL = {queue:'В черзі', progress:'Виконується', done:'Оплачено'};
+
+function defaultTypes(){
+  return [
+    {name:'280 Ah', kit:false, stock:12, reserved:2, doneSum:42000},
+    {name:'334 Ah', kit:false, stock:6,  reserved:1, doneSum:16000},
+    {name:'АКБ 280/48', kit:true, base:'280 Ah', reserved:0, doneSum:0},
+    {name:'АКБ 334/48', kit:true, base:'334 Ah', reserved:0, doneSum:0}
+  ];
+}
+function defaultEntries(){
+  return [
+    {id:1, date:'12.08', rel:'7 днів тому', qty:2, receiver:'Петренко О.', phone:'+380 67 ___ __ __', sender:'Андрій (BimmerGarage)', price:1000, sum:2000, address:'Луцьк, відділення №4 (Нова пошта)', ship:'', pay:'cod', status:'queue'},
+    {id:2, date:'15.08', rel:'4 дні тому', qty:1, receiver:'Хоменко В.', phone:'+380 50 ___ __ __', sender:'Андрій (BimmerGarage)', price:1000, sum:1000, address:'Ковель, вул. Незалежності 12 (кур’єр)', ship:'22.08', pay:'fop', status:'progress'},
+    {id:3, date:'18.08', rel:'1 день тому', qty:3, receiver:'Іванюк С.', phone:'+380 63 ___ __ __', sender:'Андрій (BimmerGarage)', price:1000, sum:3000, address:'Львів, відділення №21 (Нова пошта)', ship:'', pay:'card', status:'queue'},
+    {id:4, date:'08.08', rel:'11 днів тому', qty:1, receiver:'Мельник Т.', phone:'+380 95 ___ __ __', sender:'Андрій (BimmerGarage)', price:1000, sum:1000, address:'Ковель, самовивіз', ship:'09.08 — отримано', pay:'cash', status:'done'}
+  ];
+}
+function emptyWarehouse(){ return {types:[
+    {name:'280 Ah', kit:false, stock:0, reserved:0, doneSum:0},
+    {name:'334 Ah', kit:false, stock:0, reserved:0, doneSum:0},
+    {name:'АКБ 280/48', kit:true, base:'280 Ah', reserved:0, doneSum:0},
+    {name:'АКБ 334/48', kit:true, base:'334 Ah', reserved:0, doneSum:0}
+  ], entries:[], nextId:1}; }
+
+const STORAGE_KEY = 'bimmergarage-battery-app';
+let state = null;
+let editingId = null;
+
+function loadState(){
+  try{
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if(raw){ state = JSON.parse(raw); return; }
+  }catch(e){}
+  state = {
+    active: 1,
+    w1: {types: defaultTypes(), entries: defaultEntries(), nextId: 5},
+    w2: emptyWarehouse()
+  };
+}
+function saveState(){
+  try{
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+    showToast();
+  }catch(e){}
+}
+function showToast(){
+  const t = document.getElementById('save-toast');
+  t.classList.add('show');
+  clearTimeout(showToast._tm);
+  showToast._tm = setTimeout(()=>t.classList.remove('show'), 1200);
+}
+
+function activeWH(){ return state.active === 1 ? state.w1 : state.w2; }
+
+function switchWarehouse(n){
+  state.active = n;
+  document.getElementById('wh-btn-1').classList.toggle('active', n===1);
+  document.getElementById('wh-btn-2').classList.toggle('active', n===2);
+  document.getElementById('wh-title').textContent = 'Облік проданих батарей — Склад ' + n;
+  editingId = null;
+  saveState();
+  renderAll();
+}
+
+/* ---------- box math ---------- */
+function boxBreakdown(boxes){
+  boxes = parseInt(boxes) || 0;
+  if(boxes <= 0) return '0 ящ.';
+  const pallets = Math.floor(boxes/4), rem = boxes%4;
+  const parts = [];
+  if(pallets>0) parts.push(pallets+' акум.');
+  if(rem>0) parts.push(rem+' ящ.');
+  return parts.length ? parts.join(' + ') : '0 ящ.';
+}
+function fmtMoney(n){ n = parseFloat(n)||0; return n.toLocaleString('uk-UA') + ' ₴'; }
+
+/* ---------- rendering ---------- */
+function renderAll(){
+  renderStats();
+  renderSummary();
+  renderEntries();
+}
+
+function renderStats(){
+  const wh = activeWH();
+  const body = document.getElementById('stats-body');
+  body.innerHTML = wh.types.map((t, idx)=>{
+    if(t.kit){
+      return `<div class="stats-type">
+        <div class="st-name">${t.name} <span class="st-subname">(комплект 4 ящики ${t.base})</span></div>
+        <div class="akb-note">⚠️ При замовленні автоматично списується 4 ящики з залишку «${t.base}»</div>
+        <div class="stats-row"><span class="st-label">У черзі (заброньовано)</span><span class="st-reserved">${t.reserved} компл.</span></div>
+        <div class="stats-row"><span class="st-label">Виконано, сума</span><span class="st-done">${fmtMoney(t.doneSum)}</span></div>
+      </div>`;
+    }
+    return `<div class="stats-type">
+      <div class="st-name">${t.name}</div>
+      <div class="stats-row">
+        <span class="st-label">На складі</span>
+        <div style="text-align:right;">
+          <input type="text" class="st-stock" value="${t.stock}" oninput="onStockInput(${idx}, this.value)">
+          <div class="st-breakdown">${boxBreakdown(t.stock)}</div>
+        </div>
+      </div>
+      <div class="stats-row"><span class="st-label">У черзі (заброньовано)</span><span class="st-reserved">${t.reserved} ящ.</span></div>
+      <div class="stats-row"><span class="st-label">Виконано, сума</span><span class="st-done">${fmtMoney(t.doneSum)}</span></div>
+    </div>`;
+  }).join('');
+}
+function onStockInput(idx, val){
+  const wh = activeWH();
+  wh.types[idx].stock = parseInt(val)||0;
+  saveState();
+  renderStats();
+}
+
+function renderSummary(){
+  const wh = activeWH();
+  const q = wh.entries.filter(e=>e.status==='queue').length;
+  const p = wh.entries.filter(e=>e.status==='progress').length;
+  const d = wh.entries.filter(e=>e.status==='done').length;
+  document.getElementById('summary-cards').innerHTML = `
+    <div class="sum-card status-red"><div class="label">🔴 В черзі</div><div class="value">${q}</div></div>
+    <div class="sum-card status-green"><div class="label">🟢 Виконується</div><div class="value">${p}</div></div>
+    <div class="sum-card status-blue"><div class="label">🔵 Оплачено</div><div class="value">${d}</div></div>
+  `;
+}
+
+function renderEntries(){
+  const wh = activeWH();
+  const query = (document.getElementById('search-box').value||'').toLowerCase().trim();
+  let list = wh.entries.filter(e=>{
+    if(!query) return true;
+    return (e.receiver||'').toLowerCase().includes(query) || (e.phone||'').toLowerCase().includes(query);
+  });
+  list = list.slice().sort((a,b)=>{
+    const da = a.status==='done' ? 1 : 0, db = b.status==='done' ? 1 : 0;
+    if(da !== db) return da - db;
+    return 0;
+  });
+  document.getElementById('entries-count').textContent = wh.entries.length + ' записів';
+
+  const container = document.getElementById('entries-list');
+  if(list.length === 0){
+    container.innerHTML = '<div class="empty-hint">Записів поки немає</div>';
+    return;
+  }
+  container.innerHTML = list.map(e => cardHTML(e)).join('');
+}
+
+function statusClass(s){ return s==='queue'?'status-queue': s==='progress'?'status-progress':'status-done'; }
+function pillClass(s){ return s==='queue'?'queue': s==='progress'?'progress':'done'; }
+
+function cardHTML(e){
+  const isEditing = editingId === e.id;
+  return `<details class="wl-card ${statusClass(e.status)}" ${isEditing?'open':''}>
+    <summary onclick="${isEditing?'return false;':''}">
+      <div class="s-top">
+        <div class="s-date"><span class="d">${e.date}</span><span class="rel">${e.rel||''}</span></div>
+        <span class="status-pill ${pillClass(e.status)}"><span class="dot"></span>${STATUS_LABEL[e.status]}</span>
+        <div class="chevron">▾</div>
+      </div>
+      <div class="s-name">${e.receiver}</div>
+      <div class="s-phone">${e.phone}</div>
+      <div class="s-bottom">
+        <span class="s-qty">${e.qty} ящ.</span>
+        <span class="pay-badge ${e.pay}">${PAY_LABEL[e.pay]}</span>
+      </div>
+    </summary>
+    <div class="wl-detail">${isEditing ? editFormHTML(e) : viewDetailHTML(e)}</div>
+  </details>`;
+}
+
+function viewDetailHTML(e){
+  return `
+    <div class="d-item"><span class="d-label">Кількість, ящ.</span><span class="d-value">${e.qty}</span></div>
+    <div class="d-item"><span class="d-label">Отримувач</span><span class="d-value">${e.receiver}</span></div>
+    <div class="d-item"><span class="d-label">Відправник</span><span class="d-value">${e.sender}</span></div>
+    <div class="d-item"><span class="d-label">Телефон отримувача</span><span class="d-value">${e.phone}</span></div>
+    <div class="d-item"><span class="d-label">Ціна за ящик</span><span class="d-value">${fmtMoney(e.price)}</span></div>
+    <div class="d-item"><span class="d-label">Сума</span><span class="d-value" style="color:var(--green); font-weight:700;">${fmtMoney(e.sum)}</span></div>
+    <div class="d-item"><span class="d-label">Адреса доставки</span><span class="d-value">${e.address}</span></div>
+    <div class="d-item"><span class="d-label">Відправка</span><span class="d-value ${e.ship?'':'tbd'}">${e.ship || 'не заплановано'}</span></div>
+    <div class="d-item"><span class="d-label">Статус</span>
+      <select class="status-select v-${e.status}" onchange="changeStatus(${e.id}, this.value); this.className='status-select v-'+this.value;">
+        <option value="queue" ${e.status==='queue'?'selected':''}>🔴 В черзі</option>
+        <option value="progress" ${e.status==='progress'?'selected':''}>🟢 Виконується</option>
+        <option value="done" ${e.status==='done'?'selected':''}>🔵 Виконано і оплачено</option>
+      </select>
+    </div>
+    <div class="wl-detail-actions">
+      <button class="btn-edit" onclick="startEdit(${e.id})">✏️ Редагувати</button>
+      <button class="btn-ship" onclick="generateShipping(${e.id}, this)">📋 <span class="btn-label">Сформувати адресу</span></button>
+    </div>
+    <button class="btn-delete" onclick="deleteEntry(${e.id})">🗑 Видалити запис</button>
+    <textarea class="ship-preview" readonly rows="6"></textarea>
+  `;
+}
+
+function editFormHTML(e){
+  return `
+    <div class="d-item"><span class="d-label">Кількість, ящ.</span><input type="text" id="e-qty-${e.id}" value="${e.qty}"></div>
+    <div class="d-item"><span class="d-label">Отримувач</span><input type="text" id="e-receiver-${e.id}" value="${e.receiver}"></div>
+    <div class="d-item"><span class="d-label">Відправник</span><input type="text" id="e-sender-${e.id}" value="${e.sender}"></div>
+    <div class="d-item"><span class="d-label">Телефон отримувача</span><input type="text" id="e-phone-${e.id}" value="${e.phone}"></div>
+    <div class="d-item"><span class="d-label">Ціна за ящик</span><input type="text" id="e-price-${e.id}" value="${e.price}"></div>
+    <div class="d-item"><span class="d-label">Сума</span><input type="text" id="e-sum-${e.id}" value="${e.sum}"></div>
+    <div class="d-item"><span class="d-label">Адреса доставки</span><input type="text" id="e-address-${e.id}" value="${e.address}"></div>
+    <div class="d-item"><span class="d-label">Відправка</span><input type="text" id="e-ship-${e.id}" value="${e.ship||''}"></div>
+    <div class="wl-detail-actions">
+      <button class="btn-save" onclick="saveEdit(${e.id})">💾 Зберегти</button>
+      <button class="btn-cancel" onclick="cancelEdit()">✖ Скасувати</button>
+    </div>
+    <button class="btn-delete" onclick="deleteEntry(${e.id})">🗑 Видалити запис</button>
+  `;
+}
+
+function startEdit(id){ editingId = id; renderEntries(); }
+function cancelEdit(){ editingId = null; renderEntries(); }
+function deleteEntry(id){
+  const wh = activeWH();
+  const e = wh.entries.find(x=>x.id===id);
+  if(!e) return;
+  const ok = confirm('Видалити запис «' + e.receiver + '» (' + e.qty + ' ящ.)?\nЦю дію не можна скасувати.');
+  if(!ok) return;
+  wh.entries = wh.entries.filter(x=>x.id!==id);
+  if(editingId === id) editingId = null;
+  saveState();
+  renderSummary();
+  renderEntries();
+}
+function saveEdit(id){
+  const wh = activeWH();
+  const e = wh.entries.find(x=>x.id===id);
+  if(!e) return;
+  e.qty = parseInt(document.getElementById('e-qty-'+id).value)||0;
+  e.receiver = document.getElementById('e-receiver-'+id).value.trim();
+  e.sender = document.getElementById('e-sender-'+id).value.trim();
+  e.phone = document.getElementById('e-phone-'+id).value.trim();
+  e.price = parseFloat(document.getElementById('e-price-'+id).value)||0;
+  e.sum = parseFloat(document.getElementById('e-sum-'+id).value)||0;
+  e.address = document.getElementById('e-address-'+id).value.trim();
+  e.ship = document.getElementById('e-ship-'+id).value.trim();
+  editingId = null;
+  saveState();
+  renderEntries();
+}
+
+function changeStatus(id, val){
+  const wh = activeWH();
+  const e = wh.entries.find(x=>x.id===id);
+  if(!e) return;
+  e.status = val;
+  saveState();
+  renderSummary();
+  renderEntries();
+}
+
+function updateFormQtyBreakdown(input){
+  const out = document.getElementById('form-qty-breakdown');
+  out.textContent = input.value ? '= ' + boxBreakdown(input.value) : '';
+}
+
+function addEntry(){
+  const wh = activeWH();
+  const receiver = document.getElementById('f-receiver').value.trim();
+  if(!receiver){ alert('Вкажіть ФІО отримувача'); return; }
+  const now = new Date();
+  const entry = {
+    id: wh.nextId++,
+    date: document.getElementById('f-date').value.trim() || (now.getDate()+'.'+(now.getMonth()+1)),
+    rel: 'щойно',
+    qty: parseInt(document.getElementById('f-qty').value)||0,
+    receiver: receiver,
+    phone: document.getElementById('f-phone').value.trim(),
+    sender: document.getElementById('f-sender').value.trim() || 'Андрій (BimmerGarage)',
+    price: parseFloat(document.getElementById('f-price').value)||0,
+    sum: parseFloat(document.getElementById('f-sum').value)||0,
+    address: document.getElementById('f-address').value.trim(),
+    ship: document.getElementById('f-ship').value.trim(),
+    pay: document.getElementById('f-pay').value,
+    status: document.getElementById('f-status').value
+  };
+  wh.entries.push(entry);
+  ['f-date','f-qty','f-receiver','f-phone','f-sender','f-price','f-sum','f-address','f-ship'].forEach(id=>document.getElementById(id).value='');
+  document.getElementById('f-status').value='queue';
+  document.getElementById('f-status').className='status-select v-queue';
+  document.getElementById('form-qty-breakdown').textContent='';
+  saveState();
+  renderSummary();
+  renderEntries();
+}
+
+/* ---------- shipping label ---------- */
+function generateShipping(id, btn){
+  const wh = activeWH();
+  const e = wh.entries.find(x=>x.id===id);
+  if(!e) return;
+  const text =
+    'Кількість: ' + e.qty + ' ящ.\n' +
+    'Отримувач: ' + e.receiver + '\n' +
+    'Відправник: ' + e.sender + '\n' +
+    'Тел. отримувача: ' + e.phone + '\n' +
+    'Ціна: ' + fmtMoney(e.sum) + '\n' +
+    'Адреса отримувача: ' + e.address;
+
+  const preview = btn.closest('.wl-detail').querySelector('.ship-preview');
+  preview.value = text;
+  preview.style.display = 'block';
+
+  const label = btn.querySelector('.btn-label');
+  const original = label.textContent;
+  const showCopied = ()=>{ label.textContent='✓ Скопійовано'; setTimeout(()=>label.textContent=original, 1800); };
+  const legacyCopy = ()=>{
+    try{
+      preview.focus(); preview.select(); preview.setSelectionRange(0, text.length);
+      const ok = document.execCommand('copy');
+      if(ok) showCopied();
+      else { label.textContent='⚠️ Скопіюйте вручну'; setTimeout(()=>label.textContent=original, 2200); }
+    }catch(err){ label.textContent='⚠️ Скопіюйте вручну'; setTimeout(()=>label.textContent=original, 2200); }
+  };
+  if(navigator.clipboard && navigator.clipboard.writeText){
+    navigator.clipboard.writeText(text).then(showCopied).catch(legacyCopy);
+  } else legacyCopy();
+}
+
+/* ---------- backup export / import ---------- */
+function exportBackup(){
+  const blob = new Blob([JSON.stringify(state, null, 2)], {type:'application/json'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  const now = new Date();
+  const stamp = now.getFullYear()+'-'+String(now.getMonth()+1).padStart(2,'0')+'-'+String(now.getDate()).padStart(2,'0');
+  a.href = url;
+  a.download = 'battery-db-' + stamp + '.json';
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
+function importBackup(file){
+  if(!file) return;
+  const reader = new FileReader();
+  reader.onload = function(){
+    try{
+      const parsed = JSON.parse(reader.result);
+      if(!parsed.w1 || !parsed.w2){ alert('Файл має неправильний формат'); return; }
+      state = parsed;
+      saveState();
+      switchWarehouse(state.active || 1);
+    }catch(e){
+      alert('Не вдалося прочитати файл: ' + e.message);
+    }
+  };
+  reader.readAsText(file);
+}
+
+/* ---------- init ---------- */
+loadState();
+document.getElementById('wh-btn-'+state.active).classList.add('active');
+document.getElementById('wh-title').textContent = 'Облік проданих батарей — Склад ' + state.active;
+renderAll();
+</script>
+</body>
+</html>
