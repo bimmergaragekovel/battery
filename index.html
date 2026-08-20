@@ -369,6 +369,21 @@ function onStockInput(idx, val){
   renderStats();
 }
 
+/* ---------- АКБ kit stock deduction ---------- */
+function baseTypeIdx(wh, kitIdx){
+  const kit = wh.types[kitIdx];
+  if(!kit || !kit.kit) return -1;
+  return wh.types.findIndex(t => t.name === kit.base);
+}
+function applyKitStockDelta(wh, typeIdx, qty, sign){
+  // sign: +1 to deduct from stock (order placed), -1 to restock (order removed/reduced)
+  const t = wh.types[typeIdx];
+  if(!t || !t.kit) return;
+  const bIdx = baseTypeIdx(wh, typeIdx);
+  if(bIdx === -1) return;
+  wh.types[bIdx].stock = (wh.types[bIdx].stock || 0) - sign * 4 * (parseInt(qty)||0);
+}
+
 function renderSummary(){
   const wh = activeWH();
   const q = wh.entries.filter(e=>e.status==='queue').length;
@@ -496,6 +511,7 @@ function deleteEntry(id){
   const ok = confirm('Видалити запис «' + e.receiver + '» (' + e.qty + ' ящ.)?\nЦю дію не можна скасувати.');
   if(!ok) return;
   wh.entries = wh.entries.filter(x=>x.id!==id);
+  applyKitStockDelta(wh, e.typeIdx, e.qty, -1);
   if(editingId === id) editingId = null;
   saveState();
   renderStats();
@@ -506,6 +522,7 @@ function saveEdit(id){
   const wh = activeWH();
   const e = wh.entries.find(x=>x.id===id);
   if(!e) return;
+  const oldTypeIdx = e.typeIdx, oldQty = e.qty;
   e.qty = parseInt(document.getElementById('e-qty-'+id).value)||0;
   e.typeIdx = parseInt(document.getElementById('e-type-'+id).value);
   e.receiver = document.getElementById('e-receiver-'+id).value.trim();
@@ -516,6 +533,8 @@ function saveEdit(id){
   e.address = document.getElementById('e-address-'+id).value.trim();
   e.ship = document.getElementById('e-ship-'+id).value.trim();
   e.comment = document.getElementById('e-comment-'+id).value.trim();
+  applyKitStockDelta(wh, oldTypeIdx, oldQty, -1);
+  applyKitStockDelta(wh, e.typeIdx, e.qty, +1);
   editingId = null;
   saveState();
   renderStats();
@@ -573,6 +592,7 @@ function addEntry(){
     comment: document.getElementById('f-comment').value.trim()
   };
   wh.entries.push(entry);
+  applyKitStockDelta(wh, entry.typeIdx, entry.qty, +1);
   ['f-date','f-qty','f-receiver','f-phone','f-sender','f-price','f-sum','f-address','f-ship','f-comment'].forEach(id=>document.getElementById(id).value='');
   document.getElementById('f-status').value='queue';
   document.getElementById('f-status').className='status-select v-queue';
