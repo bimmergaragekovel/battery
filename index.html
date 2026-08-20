@@ -89,7 +89,7 @@
   .f-item{display:flex; flex-direction:column; gap:5px;}
   .f-label{font-size:10px; text-transform:uppercase; letter-spacing:.4px; color:var(--meta);}
   .f-row2{display:grid; grid-template-columns:1fr 1fr; gap:10px;}
-  .wl-form input, .wl-form select{background:#0a0a0a; border:1px solid #262626; color:var(--white); font-family:inherit; font-size:13px; padding:9px 10px; border-radius:6px; width:100%;}
+  .wl-form input, .wl-form select, .wl-form textarea{background:#0a0a0a; border:1px solid #262626; color:var(--white); font-family:inherit; font-size:13px; padding:9px 10px; border-radius:6px; width:100%; resize:none;}
   .wl-form input::placeholder{color:#555;}
   .qty-breakdown{font-size:10.5px; color:var(--meta); font-style:italic; margin-top:2px;}
   .f-submit{margin-top:2px; display:flex; align-items:center; justify-content:center; gap:6px; background:var(--accent); color:#fff; border:none; font-family:inherit; font-weight:700; font-size:13px; padding:10px; border-radius:7px; cursor:pointer;}
@@ -134,7 +134,7 @@
   .d-label{font-size:10px; text-transform:uppercase; letter-spacing:.4px; color:var(--meta);}
   .d-value{font-size:13.5px; line-height:1.4;}
   .d-value.tbd{color:var(--meta); font-style:italic;}
-  .d-item input, .d-item select{background:#0a0a0a; border:1px solid #2a2a2a; color:var(--white); font-family:inherit; font-size:13px; padding:8px 9px; border-radius:6px; width:100%;}
+  .d-item input, .d-item select, .d-item textarea{background:#0a0a0a; border:1px solid #2a2a2a; color:var(--white); font-family:inherit; font-size:13px; padding:8px 9px; border-radius:6px; width:100%; resize:none;}
   .status-select{width:100%; background:#0a0a0a; border:1px solid #2a2a2a; color:var(--white); font-family:inherit; font-weight:700; font-size:13px; padding:8px 10px; border-radius:7px; cursor:pointer;}
   .status-select.v-queue{border-color:rgba(204,0,0,.4); color:#ff6b6b;}
   .status-select.v-progress{border-color:rgba(39,196,122,.4); color:var(--green);}
@@ -204,13 +204,13 @@
     <div class="wl-form">
       <div class="f-row2">
         <div class="f-item"><span class="f-label">Дата запису</span><input type="text" id="f-date" placeholder="19.08"></div>
-        <div class="f-item"><span class="f-label">К-сть, ящ.</span><input type="text" id="f-qty" placeholder="1" oninput="updateFormQtyBreakdown(this)"><div class="qty-breakdown" id="form-qty-breakdown"></div></div>
+        <div class="f-item"><span class="f-label">К-сть, ящ.</span><input type="text" id="f-qty" placeholder="1" oninput="updateFormQtyBreakdown(this); updateFormSum();"><div class="qty-breakdown" id="form-qty-breakdown"></div></div>
       </div>
       <div class="f-item"><span class="f-label">ФІО отримувача</span><input type="text" id="f-receiver" placeholder="Прізвище Ім'я"></div>
       <div class="f-item"><span class="f-label">Телефон отримувача</span><input type="text" id="f-phone" placeholder="+380"></div>
       <div class="f-item"><span class="f-label">ФІО відправника</span><input type="text" id="f-sender" placeholder="Андрій (BimmerGarage)"></div>
       <div class="f-row2">
-        <div class="f-item"><span class="f-label">Ціна за ящик</span><input type="text" id="f-price" placeholder="1000"></div>
+        <div class="f-item"><span class="f-label">Ціна за ящик</span><input type="text" id="f-price" placeholder="1000" oninput="updateFormSum()"></div>
         <div class="f-item"><span class="f-label">Сума</span><input type="text" id="f-sum" placeholder="2000"></div>
       </div>
       <div class="f-item"><span class="f-label">Адреса доставки</span><input type="text" id="f-address" placeholder="Місто, відділення Нової пошти"></div>
@@ -232,6 +232,7 @@
           <option value="done">🔵 Виконано і оплачено</option>
         </select>
       </div>
+      <div class="f-item"><span class="f-label">Коментар</span><textarea id="f-comment" placeholder="Додаткова інформація..." rows="2"></textarea></div>
       <button class="f-submit" onclick="addEntry()">+ Додати в чергу</button>
     </div>
   </div>
@@ -429,6 +430,7 @@ function viewDetailHTML(e){
     <div class="d-item"><span class="d-label">Сума</span><span class="d-value" style="color:var(--green); font-weight:700;">${fmtMoney(e.sum)}</span></div>
     <div class="d-item"><span class="d-label">Адреса доставки</span><span class="d-value">${e.address}</span></div>
     <div class="d-item"><span class="d-label">Відправка</span><span class="d-value ${e.ship?'':'tbd'}">${e.ship || 'не заплановано'}</span></div>
+    ${e.comment ? `<div class="d-item"><span class="d-label">Коментар</span><span class="d-value">${e.comment}</span></div>` : ''}
     <div class="d-item"><span class="d-label">Статус</span>
       <select class="status-select v-${e.status}" onchange="changeStatus(${e.id}, this.value); this.className='status-select v-'+this.value;">
         <option value="queue" ${e.status==='queue'?'selected':''}>🔴 В черзі</option>
@@ -447,14 +449,15 @@ function viewDetailHTML(e){
 
 function editFormHTML(e){
   return `
-    <div class="d-item"><span class="d-label">Кількість, ящ.</span><input type="text" id="e-qty-${e.id}" value="${e.qty}"></div>
+    <div class="d-item"><span class="d-label">Кількість, ящ.</span><input type="text" id="e-qty-${e.id}" value="${e.qty}" oninput="updateEditSum(${e.id})"></div>
     <div class="d-item"><span class="d-label">Отримувач</span><input type="text" id="e-receiver-${e.id}" value="${e.receiver}"></div>
     <div class="d-item"><span class="d-label">Відправник</span><input type="text" id="e-sender-${e.id}" value="${e.sender}"></div>
     <div class="d-item"><span class="d-label">Телефон отримувача</span><input type="text" id="e-phone-${e.id}" value="${e.phone}"></div>
-    <div class="d-item"><span class="d-label">Ціна за ящик</span><input type="text" id="e-price-${e.id}" value="${e.price}"></div>
+    <div class="d-item"><span class="d-label">Ціна за ящик</span><input type="text" id="e-price-${e.id}" value="${e.price}" oninput="updateEditSum(${e.id})"></div>
     <div class="d-item"><span class="d-label">Сума</span><input type="text" id="e-sum-${e.id}" value="${e.sum}"></div>
     <div class="d-item"><span class="d-label">Адреса доставки</span><input type="text" id="e-address-${e.id}" value="${e.address}"></div>
     <div class="d-item"><span class="d-label">Відправка</span><input type="text" id="e-ship-${e.id}" value="${e.ship||''}"></div>
+    <div class="d-item"><span class="d-label">Коментар</span><textarea id="e-comment-${e.id}" rows="2">${e.comment||''}</textarea></div>
     <div class="wl-detail-actions">
       <button class="btn-save" onclick="saveEdit(${e.id})">💾 Зберегти</button>
       <button class="btn-cancel" onclick="cancelEdit()">✖ Скасувати</button>
@@ -465,6 +468,15 @@ function editFormHTML(e){
 
 function startEdit(id){ editingId = id; renderEntries(); }
 function cancelEdit(){ editingId = null; renderEntries(); }
+function updateEditSum(id){
+  const qtyEl = document.getElementById('e-qty-'+id);
+  const priceEl = document.getElementById('e-price-'+id);
+  const sumEl = document.getElementById('e-sum-'+id);
+  if(!qtyEl || !priceEl || !sumEl) return;
+  const qty = parseFloat(qtyEl.value) || 0;
+  const price = parseFloat(priceEl.value) || 0;
+  sumEl.value = (qty && price) ? (qty * price) : '';
+}
 function deleteEntry(id){
   const wh = activeWH();
   const e = wh.entries.find(x=>x.id===id);
@@ -489,6 +501,7 @@ function saveEdit(id){
   e.sum = parseFloat(document.getElementById('e-sum-'+id).value)||0;
   e.address = document.getElementById('e-address-'+id).value.trim();
   e.ship = document.getElementById('e-ship-'+id).value.trim();
+  e.comment = document.getElementById('e-comment-'+id).value.trim();
   editingId = null;
   saveState();
   renderEntries();
@@ -507,6 +520,11 @@ function changeStatus(id, val){
 function updateFormQtyBreakdown(input){
   const out = document.getElementById('form-qty-breakdown');
   out.textContent = input.value ? '= ' + boxBreakdown(input.value) : '';
+}
+function updateFormSum(){
+  const qty = parseFloat(document.getElementById('f-qty').value) || 0;
+  const price = parseFloat(document.getElementById('f-price').value) || 0;
+  document.getElementById('f-sum').value = (qty && price) ? (qty * price) : '';
 }
 
 function addEntry(){
@@ -527,10 +545,11 @@ function addEntry(){
     address: document.getElementById('f-address').value.trim(),
     ship: document.getElementById('f-ship').value.trim(),
     pay: document.getElementById('f-pay').value,
-    status: document.getElementById('f-status').value
+    status: document.getElementById('f-status').value,
+    comment: document.getElementById('f-comment').value.trim()
   };
   wh.entries.push(entry);
-  ['f-date','f-qty','f-receiver','f-phone','f-sender','f-price','f-sum','f-address','f-ship'].forEach(id=>document.getElementById(id).value='');
+  ['f-date','f-qty','f-receiver','f-phone','f-sender','f-price','f-sum','f-address','f-ship','f-comment'].forEach(id=>document.getElementById(id).value='');
   document.getElementById('f-status').value='queue';
   document.getElementById('f-status').className='status-select v-queue';
   document.getElementById('form-qty-breakdown').textContent='';
